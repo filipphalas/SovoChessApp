@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Library · SovoChess{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: 20px;">
+    <h1 style="font-size: 2rem;">Your library</h1>
+    <span class="muted small">{{ total }} game{{ total|pluralize }}</span>
+</div>
+
+<div class="lib-layout">
+    <aside>
+        <nav class="panel lib-nav" aria-label="Collections">
+            <a href="{% url 'library' %}" class="{% if not active %}active{% endif %}"><span>All games</span><span class="muted">{{ total }}</span></a>
+            <a href="?collection=played" class="{% if active == 'played' %}active{% endif %}"><span>Played on SovoChess</span><span class="muted">{{ played_count }}</span></a>
+            <a href="?collection=none" class="{% if active == 'none' %}active{% endif %}"><span>Imported, unsorted</span></a>
+            {% for c in collections %}
+            <a href="?collection={{ c.id }}" class="{% if active == c.id|stringformat:'s' %}active{% endif %}"><span>{{ c.name }}</span><span class="muted">{{ c.n }}</span></a>
+            {% endfor %}
+        </nav>
+        <form method="post" action="{% url 'collection_create' %}" class="panel panel-pad" style="margin-top: 14px;">
+            {% csrf_token %}
+            <label class="label" for="new-col">New collection</label>
+            <div style="display: flex; gap: 6px;">
+                <input class="input" id="new-col" name="name" maxlength="80" placeholder="e.g. Sicilian games" required>
+                <button class="btn" type="submit">Add</button>
+            </div>
+        </form>
+        {% if active and active != 'played' and active != 'none' %}
+        <form method="post" action="{% url 'collection_delete' active %}" style="margin-top: 10px;" id="del-col">
+            {% csrf_token %}
+            <label class="check small"><input type="checkbox" name="with_games" value="1"> Also delete its games</label>
+            <button class="btn btn-sm btn-danger" type="submit">Delete this collection</button>
+        </form>
+        {% endif %}
+    </aside>
+
+    <section>
+        <div class="lib-tools">
+            <form method="get">
+                {% if active %}<input type="hidden" name="collection" value="{{ active }}">{% endif %}
+                <input class="input" type="search" name="q" value="{{ q }}" placeholder="Search players, events, openings, ECO, notes">
+                <button class="btn" type="submit">Search</button>
+            </form>
+            <label class="btn btn-primary" for="lib-file" style="cursor: pointer;">Upload PGN</label>
+            <input type="file" id="lib-file" accept=".pgn,.txt" class="visually-hidden">
+            <a class="btn" href="{% url 'library_export' %}{% if active and active != 'played' and active != 'none' %}?collection={{ active }}{% endif %}">Download {% if active and active != 'played' and active != 'none' %}collection{% else %}all{% endif %} as PGN</a>
+        </div>
+        <p class="alert" id="lib-msg" hidden></p>
+
+        <div class="panel table-wrap">
+            <table class="table">
+                <thead>
+                    <tr><th>White</th><th>Black</th><th>Result</th><th>Opening</th><th>Event</th><th class="num">Moves</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for g in games %}
+                    <tr>
+                        <td>{{ g.white|default:"?" }}</td>
+                        <td>{{ g.black|default:"?" }}</td>
+                        <td class="nowrap">{{ g.result|default:"*" }}</td>
+                        <td class="small">{% if g.eco %}<span class="tag">{{ g.eco }}</span> {% endif %}{{ g.opening }}</td>
+                        <td class="small muted">{{ g.event }}{% if g.date %} &middot; {{ g.date }}{% endif %}</td>
+                        <td class="num">{% if g.ply_count %}{% widthratio g.ply_count 2 1 %}{% endif %}</td>
+                        <td class="nowrap"><a href="{% url 'saved_game' g.pk %}" class="btn btn-sm">Open</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty">
+                        {% if q %}No games match "{{ q }}".{% else %}No games here yet. Finished games against SovoBot are added automatically, or upload a PGN.{% endif %}
+                    </td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if shown_limited %}<p class="small muted" style="margin-top: 8px;">Showing the first 300. Search to narrow it down.</p>{% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module">
+    import { Chess } from '{% static "vendor/chessjs/chess.js" %}';
+    import * as T from '{% static "js/pgn-tree.js" %}';
+
+    const msg = document.getElementById('lib-msg');
+    const csrf = document.querySelector('meta[name=csrf-token]').content;
+    const active = '{{ active|escapejs }}';
+
+    document.getElementById('lib-file').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const r = new FileReader();
+        r.onload = () => {
+            const games = T.splitGames(r.result).slice(0, 500).map((g) => {
+                const p = T.parseGame(Chess, g);
+                const uci = [];
+                for (let n = p.root; n.children.length && uci.length < 20; n = n.children[0]) uci.push(n.children[0].uci);
+                const tags = Object.entries(g.headers).map(([k, v]) => '[' + k + ' "' + v.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]').join('\n');
+                return { pgn: (tags + '\n\n' + g.movetext.trim()).trim(), headers: g.headers, uci: uci.join(' '), plies: T.countPlies(p.root) };
+            });
+            if (!games.length) { msg.textContent = 'No games found in that file.'; msg.hidden = false; return; }
+            const body = { games };
+            if (/^\d+$/.test(active)) body.collection_id = active;
+            msg.className = 'flash'; msg.textContent = 'Importing ' + games.length + ' games…'; msg.hidden = false;
+            fetch('{% url "library_import" %}', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }, body: JSON.stringify(body),
+            }).then((res) => res.json()).then((d) => {
+                if (d.error) { msg.className = 'alert'; msg.textContent = d.error; return; }
+                window.location.reload();
+            }).catch(() => { msg.className = 'alert'; msg.textContent = 'Upload failed. Please try again.'; });
+        };
+        r.readAsText(file);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Guides · SovoChess{% endblock %}
+
+{% block content %}
+<header class="masthead">
+    <h1>Guides</h1>
+    <p>Classic games, endgames and tactics with boards you can play through. For the latest news see <a href="{% url 'news' %}">News</a>.</p>
+</header>
+<nav class="cat-bar" aria-label="Categories">
+    <a href="{% url 'articles' %}" class="{% if not active %}active{% endif %}">Everything</a>
+    {% for key, label in categories %}
+        <a href="?c={{ key }}" class="{% if active == key %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+</nav>
+
+{% if lead %}
+<a class="lead-story reveal" href="{% url 'article' lead.slug %}">
+    <div class="thumb">
+        {% if lead.image %}<img src="{% static lead.image %}" alt="">
+        {% else %}<div class="mini-board" data-fen="{{ lead.cover_fen }}"></div>{% endif %}
+    </div>
+    <div>
+        <span class="kicker">{{ lead.get_category_display }}</span>
+        <h2>{{ lead.title }}</h2>
+        <p>{{ lead.dek }}</p>
+        <p class="small muted" style="font-family: var(--font-body); margin-top: 10px;">{{ lead.published|date:"j F Y" }} &middot; {{ lead.reading_minutes }} min read</p>
+    </div>
+</a>
+{% else %}
+<p class="empty">Nothing in this category yet.</p>
+{% endif %}
+
+<div class="grid-3">
+    {% for a in rest %}
+    <a class="story reveal {% cycle '' 'd1' 'd2' %}" href="{% url 'article' a.slug %}">
+        {% if a.image %}<div class="thumb"><img src="{% static a.image %}" alt="" loading="lazy"></div>
+        {% else %}<div class="thumb diagram"><div class="mini-board" data-fen="{{ a.cover_fen }}"></div></div>{% endif %}
+        <span class="kicker">{{ a.get_category_display }}</span>
+        <h3>{{ a.title }}</h3>
+        <p>{{ a.dek }}</p>
+        <p class="meta">{{ a.published|date:"j M Y" }} &middot; {{ a.reading_minutes }} min read</p>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/board-diagram.js' %}" data-pieces="{% static 'img/chesspieces/wikipedia/' %}"></script>
+{% endblock %}

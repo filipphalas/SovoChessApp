@@ -1,59 +1,158 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Home - SovoChess {% endblock %}
+{% block title %}SovoChess{% endblock %}
 
 {% block content %}
 
-<!--shown after login, displays user info and options -->
-<div style="text-align: center; margin-bottom: 50px;">
-    <h1 style="color: #ffffff;">Welcome to SovoChess!</h1>
-    <p style="margin-top: 23px; color: #0255ff;">Filip Halas- Assignment 2</p>
-</div>
-
-{% if user.is_authenticated %}
+<div class="home-top">
     <!--if the user is logged on show this-->
-    <div style="text-align: center; background-color: #1b65f8; padding: 30px; border-radius: 9px; max-width: 450px; margin: 0 auto;">
-        <h3>Hello, {{ user.username }}!</h3>
-        <p style="margin-top: 10px; color: #ffffff;">Current Rating: <strong style="color: #00c5ff;">{{ user.current_rating }}</strong></p>
-        <a href="{% url 'start_game' %}">
-            <button style="margin-top: 20px; padding: 25px 50px; background-color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
-                Play Chess
-            </button>
-        </a>
-    </div>
-
-{% else %}
-    <!-- user is not logged in=prompt them to register or login -->
-    <div style="text-align: center;">
-        <p style="color: #aaaaaa;">Please login or register to play!</p>
-        <div style="margin-top: 21px;">
-            <a href="{% url 'login' %}">
-                <button style="padding: 10px 30px; background-color: #00edff; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">Login</button>
-            </a>
-            <a href="{% url 'register' %}">
-                <button style="padding: 10px 30px; background-color: #3a5cb7; border: 1px solid #10c4fa; color: #fff3f3; border-radius: 4px; cursor: pointer;">Register</button>
-            </a>
+    {% if user.is_authenticated %}
+    <section class="panel">
+        <div class="panel-pad" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+            <div>
+                <h1 style="font-size:2rem;">{{ user.username }}</h1>
+                <p class="muted">Member since {{ user.date_joined|date:"F Y" }}{% if user.profile.favourite_opening %} &middot; plays the {{ user.profile.favourite_opening }}{% endif %}</p>
+            </div>
+            <div style="text-align:right;">
+                <div class="rating" style="font-size:2.4rem; line-height:1;">{{ user.current_rating }}</div>
+                <span class="small muted">rating</span>
+            </div>
         </div>
-    </div>
-{% endif %}
+        <div class="me-stats">
+            <div><b>{{ user.profile.total_games|default:0 }}</b><span>games</span></div>
+            <div><b>{{ user.profile.total_wins|default:0 }}</b><span>wins</span></div>
+            <div><b>{{ user.profile.total_losses|default:0 }}</b><span>losses</span></div>
+            <div><b>{{ prep_count }}</b><span>prep files</span></div>
+        </div>
 
-<!-- leaderboard shown to everyone -->
-<div style="max-width: 500px; margin: 40px auto 0 auto; background-color: #1e1e2e; border: 3px solid #333; border-radius: 10px; padding: 25px;">
-    <h3 style="color: #ffffff; margin-bottom: 20px; text-align: center; letter-spacing: 1px;">Leaderboard</h3>
-    <table style="width: 100%; border-collapse: collapse;">
-        <tr style="color: #ffffff; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-            <th style="text-align: left; padding-bottom: 10px;">#</th>
-            <th style="text-align: left; padding-bottom: 10px;">Player</th>
-            <th style="text-align: right; padding-bottom: 10px;">Rating</th>
-        </tr>
-        {% for player in top_players %}
-        <tr style="border-top: 1px solid #333;">
-            <td style="padding: 13px 0; color: #888;">{{ forloop.counter }}</td>
-            <td style="padding: 12px 0; color: #00edff;">{{ player.username }}</td>
-            <td style="padding: 10px 0; color: #ffffff; text-align: right; font-weight: bold;">{{ player.current_rating }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <div class="panel-head" style="border-top:1px solid var(--rule);">
+            <h3>Recent games</h3>
+            <a href="{% url 'library' %}" class="small">Library</a>
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <tbody>
+                {% for g in recent_games %}
+                    <tr>
+                        <td><a href="{% url 'saved_game' g.pk %}">{{ g.white|default:"?" }} – {{ g.black|default:"?" }}</a></td>
+                        <td class="muted small">{{ g.opening|default:"" }}</td>
+                        <td class="num nowrap">
+                            {% if g.source == 'played' and g.result == '1-0' %}<span class="tag win">Won</span>
+                            {% elif g.source == 'played' and g.result == '0-1' %}<span class="tag loss">Lost</span>
+                            {% else %}<span class="tag">{{ g.result|default:"*" }}</span>{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td class="empty">No games yet. Pick a time control to play your first one.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% else %}
+    <!-- user is not logged in=prompt them to register or login -->
+    <section class="painting-hero">
+        <img src="{% static 'img/art/eakins-chess-players.jpg' %}" alt="Two men play chess at a table while an older man watches, in a dim 19th-century room. Painting by Thomas Eakins.">
+        <div class="copy">
+            <h1>Play a game. Prepare the next one.</h1>
+            <p>Play the bot with a real clock, keep your games and opening preparation in one place, and analyse them with Stockfish in your browser.</p>
+            <div class="btn-row">
+                <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Create an account</a>
+                <a href="{% url 'analysis' %}" class="btn btn-lg">Open the analysis board</a>
+            </div>
+            <span class="credit">Thomas Eakins, <i>The Chess Players</i>, 1876</span>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="panel play-box" id="play">
+        <div class="panel-head"><h3>New game vs SovoBot</h3><span class="small" style="color:#cfc3b1;">you play White</span></div>
+        {% if open_game %}
+        <div class="resume" style="margin-top:14px;">
+            <span>You have a game in progress{% if open_game.is_timed %} ({{ open_game.time_control_label }}){% endif %}.</span>
+            <a href="{% url 'game' open_game.id %}" class="btn btn-sm btn-dark">Continue</a>
+        </div>
+        {% endif %}
+        <div class="tc-grid">
+            {% for tc in time_controls %}
+            <a class="tc" href="{% url 'start_game' %}?tc={{ tc.key|urlencode:'' }}">
+                <strong>{{ tc.label }}</strong>
+                <span>{{ tc.kind }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        <p class="foot">Minutes + seconds added per move. {% if not user.is_authenticated %}You'll need to <a href="{% url 'login' %}">log in</a> first.{% endif %}</p>
+    </section>
 </div>
 
+<div class="home-cols">
+    <section class="section">
+        <div class="section-head">
+            <h2>Chess news</h2>
+            <a href="{% url 'news' %}">More news</a>
+        </div>
+        <ul class="headlines" id="news"><li class="muted small">Loading headlines…</li></ul>
+
+        <div class="section-head" style="margin-top:40px;">
+            <h2>Guides</h2>
+            <a href="{% url 'articles' %}">All guides</a>
+        </div>
+        <div class="grid-3">
+            {% for a in articles %}
+            <a class="story reveal {% cycle '' 'd1' 'd2' %}" href="{% url 'article' a.slug %}">
+                {% if a.image %}
+                    <div class="thumb"><img src="{% static a.image %}" alt="" loading="lazy"></div>
+                {% else %}
+                    <div class="thumb diagram"><div class="mini-board" data-fen="{{ a.cover_fen }}"></div></div>
+                {% endif %}
+                <span class="kicker">{{ a.get_category_display }}</span>
+                <h3>{{ a.title }}</h3>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% if user.is_authenticated %}
+        <div class="section-head" style="margin-top:40px;">
+            <h2>Your preparation</h2>
+            <a href="{% url 'analysis' %}">New prep file</a>
+        </div>
+        {% if preps %}
+        <ul class="news-list">
+            {% for p in preps %}
+            <li><a href="{% url 'prep_open' p.pk %}">{{ p.title }}</a>
+                <span class="src">{{ p.get_side_display }}{% if p.opponent %} &middot; vs {{ p.opponent }}{% endif %} &middot; edited {{ p.updated|timesince }} ago</span></li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">You haven't saved any preparation yet. Open the <a href="{% url 'analysis' %}">analysis board</a>, play through your lines and press Save.</p>
+        {% endif %}
+        {% endif %}
+    </section>
+
+    <div>
+        <!-- leaderboard shown to everyone -->
+        <section class="section" id="leaderboard">
+            <div class="section-head"><h2>Leaderboard</h2></div>
+            <table class="table">
+                <tbody>
+                {% for player in top_players %}
+                    <tr {% if player == user %}class="is-me"{% endif %}>
+                        <td class="muted" style="width:32px;">{{ forloop.counter }}</td>
+                        <td>{{ player.username }}</td>
+                        <td class="num rating">{{ player.current_rating }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td class="empty">Nobody has played yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/board-diagram.js' %}" data-pieces="{% static 'img/chesspieces/wikipedia/' %}"></script>
+<script src="{% static 'js/news.js' %}" data-url="{% url 'news_json' %}" data-limit="8"></script>
 {% endblock %}

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.idea/
+
+# engine: large data and model weights
+engine/data/raw/*
+engine/data/processed/*
+engine/checkpoints/*
+!engine/**/.gitkeep
+db.sqlite3
+db.sqlite3
+db.sqlite3

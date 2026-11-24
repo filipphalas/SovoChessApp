@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Credits & licences · SovoChess{% endblock %}
+
+{% block content %}
+<div class="doc">
+    <h1>Credits &amp; licences</h1>
+    <p>SovoChess is built on other people's generous work.</p>
+
+    <h2>Software</h2>
+    <ul>
+        <li><strong>Stockfish</strong> (via stockfish.js): GNU General Public License v3. The source is available at <a href="https://github.com/official-stockfish/Stockfish">github.com/official-stockfish/Stockfish</a> and <a href="https://github.com/nmrugg/stockfish.js">github.com/nmrugg/stockfish.js</a>.</li>
+        <li><strong>chess.js</strong>: BSD 2-Clause licence, <a href="https://github.com/jhlywa/chess.js">github.com/jhlywa/chess.js</a>.</li>
+        <li><strong>chessboard.js</strong>: MIT licence, <a href="https://chessboardjs.com">chessboardjs.com</a>.</li>
+        <li><strong>jQuery</strong>: MIT licence.</li>
+        <li><strong>Django</strong>: BSD 3-Clause licence.</li>
+    </ul>
+
+    <h2>Pictures</h2>
+    <ul>
+        <li>Chess pieces by Colin M.L. Burnett (Cburnett), from Wikimedia Commons, licensed CC BY-SA 3.0.</li>
+        <li>Thomas Eakins, <i>The Chess Players</i> (1876). Public domain. <a href="https://commons.wikimedia.org/wiki/File:Thomas_Eakins_-_The_Chess_Players.jpg">Source</a></li>
+        <li>Sofonisba Anguissola, <i>The Chess Game</i> (1555). Public domain. <a href="https://commons.wikimedia.org/wiki/File:The_Chess_Game_(Sofonisba_Anguissola)_1555_(4096x3236px).jpg">Source</a></li>
+        <li>Honoré Daumier, <i>The Chess Players</i> (c. 1863). Public domain. <a href="https://commons.wikimedia.org/wiki/File:Honor%C3%A9_Daumier_032.jpg">Source</a></li>
+    </ul>
+
+    <h2>News headlines</h2>
+    <p>Headlines on the home and Read pages come from the public RSS feeds of the sites they link to. Only the headline and a link are shown. The articles belong to their publishers.</p>
+</div>
+{% endblock %}

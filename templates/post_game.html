@@ -1,71 +1,43 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Game Result - SovoChess{% endblock %}
+{% block title %}Game {{ game.id }} summary · SovoChess{% endblock %}
 
 {% block content %}
-
-<div style="max-width: 600px; margin: 0 auto; text-align: center;">
-
+<div class="result-page">
     <!-- result banner -->
-    {% if user_won %}
-        <div style="background-color: #1a472a; border: 1px solid #2ecc71; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-            <h1 style="color: #2ecc71; font-size: 42px; margin-bottom: 5px;">Victory!</h1>
-            <p style="color: #aaaaaa;">You won the game</p>
+    <div class="result-head {{ result }}">
+        <div>
+            <p class="kicker">{{ game.date_played|date:"j F Y" }} &middot; {% if game.is_timed %}{{ game.time_control_label }}{% else %}untimed{% endif %}</p>
+            <h1>
+                {% if result == 'win' %}You beat SovoBot
+                {% elif result == 'loss' %}SovoBot won this one
+                {% elif result == 'draw' %}A draw
+                {% else %}This game isn't finished{% endif %}
+            </h1>
+            <p class="muted">
+                {% if game.termination %}{{ game.get_termination_display }}.{% endif %}
+                {% if result == 'unfinished' %}<a href="{% url 'game' game.id %}">Go back to the board</a>{% endif %}
+            </p>
         </div>
-    {% else %}
-        <div style="background-color: #4a1a1a; border: 1px solid #e74c3c; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-            <h1 style="color: #e74c3c; font-size: 42px; margin-bottom: 5px;">Defeat</h1>
-            <p style="color: #aaaaaa;">You lost the game</p>
-        </div>
-    {% endif %}
+        <div class="score">{% if result == 'win' %}1–0{% elif result == 'loss' %}0–1{% elif result == 'draw' %}½–½{% else %}*{% endif %}</div>
+    </div>
 
     <!-- game details -->
-    <div style="background-color: #1e1e2e; border: 1px solid #333; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-
-        <div style="margin-bottom: 20px;">
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Opening Played</p>
-            <p style="color: #f0c040; font-size: 20px; margin-top: 5px;">{{ game.opening_name }}</p>
-        </div>
-
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 20px;">
-
-        <div style="margin-bottom: 20px;">
-    <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Winner</p>
-    <p style="color: #ffffff; font-size: 20px; margin-top: 5px;">
-        {% if game.winner %}{{ game.winner.username }}{% else %}Draw{% endif %}
-    </p>
-</div>
-
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 20px;">
-
-        <div style="margin-bottom: 20px;">
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your Rating</p>
-            <p style="color: #f0c040; font-size: 28px; font-weight: bold; margin-top: 5px;">{{ request.user.current_rating }}</p>
-        </div>
-
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 20px;">
-
-        <div>
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Moves Played</p>
-            <p style="color: #ffffff; font-size: 20px; margin-top: 5px;">{{ game.moves.count }}</p>
-        </div>
-
+    <div class="facts">
+        <div><b>{{ game.opening_name|default:"Unknown" }}</b><span>Opening</span></div>
+        <div><b>{{ game.moves.count }}</b><span>Half-moves played</span></div>
+        <div><b class="rating">{{ request.user.current_rating }}</b><span>Your rating</span></div>
     </div>
 
     <!-- buttons -->
-    <div>
-        <a href="/game/start/">
-            <button style="padding: 14px 40px; background-color: #f0c040; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-right: 15px; font-family: 'Times New Roman', serif;">
-                Play Again
-            </button>
-        </a>
-        <a href="/">
-            <button style="padding: 14px 40px; background-color: #1e1e2e; border: 1px solid #f0c040; color: white; border-radius: 6px; cursor: pointer; font-size: 16px; font-family: 'Times New Roman', serif;">
-                Home
-            </button>
-        </a>
+    <div class="btn-row">
+        <a href="{% url 'start_game' %}?tc={{ game.time_control_label|urlencode }}" class="btn btn-primary btn-lg">Play again</a>
+        {% if saved_game %}
+            <a href="{% url 'saved_game' saved_game.pk %}" class="btn btn-lg">Analyse this game</a>
+            <a href="{% url 'library_export' %}?game={{ saved_game.pk }}" class="btn btn-lg btn-quiet">Download PGN</a>
+        {% endif %}
+        <a href="{% url 'home' %}" class="btn btn-lg btn-quiet">Home</a>
     </div>
-
 </div>
-
 {% endblock %}

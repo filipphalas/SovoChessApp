@@ -1,65 +1,63 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}SovoChess{% endblock %}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-
-        }
-        body {
-            background-color: #2c2c3e;
-            color: #ffffff;
-        }
-        nav {
-            background-color: #1e1e2e;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        nav a {
-            color: #ffffff;
-            text-decoration: none;
-            margin-left: 20px;
-            font-size: 16px;
-        }
-        nav a:hover {
-            color: #f0c040;
-        }
-        .nav-brand {
-            color: #ffffff;
-            font-size: 28px;
-            font-weight: bold;
-            text-decoration: none;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/chessboard-1.0.0.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    {% block head %}{% endblock %}
 </head>
 <body>
-    <nav>
-        <a href="{% url 'home' %}" class="nav-brand">SovoChess</a>
-        <div>
-            {% if user.is_authenticated %}
-                <a href="#">{{ user.username }}</a>
-                <a href="{% url 'logout' %}">Logout</a>
-            {% else %}
-                <a href="{% url 'login' %}">Login</a>
-                <a href="{% url 'register' %}">Register</a>
-            {% endif %}
+    {% with section=request.resolver_match.url_name %}
+    <header class="site-nav">
+        <div class="container">
+            <a href="{% url 'home' %}" class="brand">SovoChess</a>
+            <nav class="nav-main" aria-label="Main">
+                <a href="{% url 'home' %}#play" class="{% if section == 'home' or section == 'game' or section == 'post_game' %}active{% endif %}">Play</a>
+                <a href="{% url 'analysis' %}" class="{% if section == 'analysis' or section == 'prep_open' or section == 'saved_game' %}active{% endif %}">Analysis</a>
+                {% if user.is_authenticated %}
+                <a href="{% url 'library' %}" class="hide-xs {% if section == 'library' %}active{% endif %}">Library</a>
+                {% endif %}
+                <a href="{% url 'news' %}" class="{% if section == 'news' or section == 'articles' or section == 'article' %}active{% endif %}">News</a>
+            </nav>
+            <div class="nav-user">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'account' %}" class="me hide-sm">{{ user.username }}<span class="rating">{{ user.current_rating }}</span></a>
+                    <a href="{% url 'logout' %}">Log out</a>
+                {% else %}
+                    <a href="{% url 'login' %}">Log in</a>
+                    <a href="{% url 'register' %}" class="btn btn-primary btn-sm">Sign up</a>
+                {% endif %}
+            </div>
         </div>
-    </nav>
-    <div class="container">
-        {% block content %}
+    </header>
+    {% endwith %}
+
+    <main class="container {% block main_class %}{% endblock %}">
+        {% block messages %}
+            {% for message in messages %}
+                <div class="flash {% if message.tags == 'error' %}error{% endif %}" role="status">{{ message }}</div>
+            {% endfor %}
         {% endblock %}
-    </div>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <span>&copy; {% now "Y" %} {{ site.name|default:"SovoChess" }} &middot; run by {{ site.operator|default:"Filip Halas" }}</span>
+            <nav aria-label="Footer">
+                <a href="{% url 'news' %}">News</a>
+                <a href="{% url 'articles' %}">Guides</a>
+                <a href="{% url 'privacy' %}">Privacy</a>
+                <a href="{% url 'terms' %}">Terms</a>
+                <a href="{% url 'licenses' %}">Credits &amp; licences</a>
+            </nav>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/reveal.js' %}" defer></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

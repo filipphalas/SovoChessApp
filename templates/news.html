@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Chess news · SovoChess{% endblock %}
+
+{% block content %}
+<div class="section-head" style="margin-bottom: 6px;">
+    <h1 style="font-size: 2rem;">Chess news</h1>
+    <span class="small muted">from {% for f in feeds %}<a href="{{ f.home }}" target="_blank" rel="noopener">{{ f.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+</div>
+<nav class="cat-bar" style="justify-content: flex-start;" aria-label="Sources">
+    <a href="{% url 'news' %}" class="{% if not source %}active{% endif %}">All</a>
+    {% for f in feeds %}<a href="?source={{ f.name|urlencode }}" class="{% if source == f.name %}active{% endif %}">{{ f.name }}</a>{% endfor %}
+</nav>
+
+<div class="home-cols" style="margin-top: 0;">
+    <section>
+        <!-- headlines link straight to the official sites -->
+        <ul class="headlines">
+            {% for it in items %}
+            {% ifchanged it.date.date %}<li class="day">{{ it.date|date:"l j F"|default:"Older" }}</li>{% endifchanged %}
+            <li>
+                <a href="{{ it.url }}" target="_blank" rel="noopener">{{ it.title }}</a>
+                <span class="src">{{ it.source }}{% if it.date %} &middot; {{ it.date|time:"H:i" }}{% endif %}</span>
+            </li>
+            {% empty %}
+            <li class="empty">Couldn't load any news right now, try again in a bit.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <aside>
+        <div class="section-head"><h2>Guides</h2><a href="{% url 'articles' %}">All guides</a></div>
+        {% for a in guides %}
+        <a class="story reveal" href="{% url 'article' a.slug %}" style="margin-bottom: 22px;">
+            {% if a.image %}<div class="thumb"><img src="{% static a.image %}" alt="" loading="lazy"></div>
+            {% else %}<div class="thumb diagram"><div class="mini-board" data-fen="{{ a.cover_fen }}"></div></div>{% endif %}
+            <span class="kicker">{{ a.get_category_display }}</span>
+            <h3>{{ a.title }}</h3>
+        </a>
+        {% endfor %}
+    </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/board-diagram.js' %}" data-pieces="{% static 'img/chesspieces/wikipedia/' %}"></script>
+{% endblock %}

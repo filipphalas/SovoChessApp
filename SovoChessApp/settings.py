@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'chess',
+    'sovochess.apps.ChessConfig',
 ]
 
 MIDDLEWARE = [
@@ -64,6 +64,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'sovochess.context_processors.site_info',
             ],
         },
     },
@@ -122,3 +123,38 @@ STATIC_URL = 'static/'
 AUTH_USER_MODEL= 'chess.User'
 
 LOGIN_URL = '/login/'
+
+
+# stockfish runs in the browser (wasm) so it needs the right file type
+import mimetypes
+mimetypes.add_type('application/wasm', '.wasm')
+mimetypes.add_type('text/javascript', '.js')
+
+
+# shown on privacy, terms and in the footer
+# TODO fill in real details before the site goes public
+SITE_INFO = {
+    'name': 'SovoChess',
+    'operator': 'Filip Halas',
+    'contact_email': 'contact@example.com',   # TODO real email
+    'country': '',                            # TODO
+    'address': '',                            # TODO only needed if the site makes money
+    'last_updated': '24 November 2026',
+}
+
+
+# chess news on home + read page
+# only headline + link to the article, never the text or pics. remove a feed if a site asks
+NEWS_FEEDS = [
+    {'name': 'FIDE', 'url': 'https://www.fide.com/rss', 'home': 'https://www.fide.com/news'},
+    {'name': 'Chess.com', 'url': 'https://www.chess.com/rss/news', 'home': 'https://www.chess.com/news'},
+    {'name': 'ChessBase', 'url': 'https://en.chessbase.com/feed', 'home': 'https://en.chessbase.com'},
+    {'name': 'TWIC', 'url': 'https://theweekinchess.com/twic-rss-feed', 'home': 'https://theweekinchess.com'},
+    {'name': 'Lichess', 'url': 'https://lichess.org/@/Lichess/blog.atom', 'home': 'https://lichess.org/blog'},
+]
+
+
+# which engine the bot uses, random for now
+# when my engine is done:
+# SOVO_ENGINE = {'name': 'neural', 'checkpoint': BASE_DIR / 'engine' / 'checkpoints' / 'best.pt', 'time_limit_ms': 1500}
+SOVO_ENGINE = {'name': 'random'}

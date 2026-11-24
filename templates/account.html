@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Your account · SovoChess{% endblock %}
+
+{% block content %}
+<div class="doc">
+    <h1>Your account</h1>
+    <p class="muted">{{ user.username }}{% if user.email %} &middot; {{ user.email }}{% endif %} &middot; joined {{ user.date_joined|date:"j F Y" }}</p>
+
+    <div class="facts" style="margin-top: 20px;">
+        <div><b class="rating">{{ user.current_rating }}</b><span>Rating</span></div>
+        <div><b>{{ played_count }}</b><span>Games played here</span></div>
+        <div><b>{{ saved_count }}</b><span>Games in library</span></div>
+        <div><b>{{ prep_count }}</b><span>Prep files</span></div>
+    </div>
+
+    <h2>Download your data</h2>
+    <p>A JSON file with your account details, every game you've played, your library and all your preparation.</p>
+    <a class="btn" href="{% url 'account_export' %}">Download my data</a>
+    <a class="btn btn-quiet" href="{% url 'library_export' %}">Download library as PGN</a>
+
+    <h2>Delete your account</h2>
+    <p>This permanently deletes your account, games, library and preparation. It can't be undone.</p>
+    <form method="post" action="{% url 'account_delete' %}" class="panel panel-pad" style="max-width: 420px;">
+        {% csrf_token %}
+        <div class="field">
+            <label for="del-pw">Confirm with your password</label>
+            <input id="del-pw" class="input" type="password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-danger">Delete my account</button>
+    </form>
+</div>
+{% endblock %}

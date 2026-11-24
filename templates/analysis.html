@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if prep %}{{ prep.title }}{% elif saved_game %}{{ saved_game }}{% else %}Analysis board{% endif %} · SovoChess{% endblock %}
+{% block main_class %}wide{% endblock %}
+
+{% block content %}
+<div class="an-layout">
+
+    <!-- list of my prep files -->
+    <aside class="an-preps panel">
+        <div class="panel-head">
+            <h3>Preparation</h3>
+            {% if user.is_authenticated %}<a href="{% url 'analysis' %}" class="btn btn-sm btn-dark" title="Start a new prep file">New</a>{% endif %}
+        </div>
+        {% if user.is_authenticated %}
+            <ul class="prep-list" id="prep-list">
+                {% for p in preps %}
+                <li><a href="{% url 'prep_open' p.pk %}" class="{% if prep and prep.pk == p.pk %}active{% endif %}">
+                    <span class="side-dot {{ p.side }}" title="{{ p.get_side_display }}"></span>{{ p.title }}
+                    <small>{% if p.opponent %}vs {{ p.opponent }} &middot; {% endif %}{{ p.updated|date:"j M Y" }}</small>
+                </a></li>
+                {% empty %}
+                <li class="small muted" style="padding: 14px;" id="prep-empty">No prep files yet. Build a line on the board, give it a name and press Save.</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="small muted panel-pad"><a href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in</a> to save preparation to your account. You can still use the board and engine.</p>
+        {% endif %}
+    </aside>
+
+    <!-- board -->
+    <section class="board-col" id="board-col">
+        <div class="board-stack" id="board-stack">
+            <div class="an-board-wrap">
+                <div class="eval-bar off" id="eval-bar" aria-hidden="true">
+                    <span class="num top" id="eval-top"></span>
+                    <div class="white" id="eval-white"></div>
+                    <span class="num bottom" id="eval-bottom"></span>
+                </div>
+                <div id="board" class="board-shadow"></div>
+            </div>
+            <div class="an-nav">
+                <button type="button" class="btn" data-nav="start" title="Start (Home)">&#x23EE;</button>
+                <button type="button" class="btn" data-nav="back" title="Back (&larr;)">&#x25C0;</button>
+                <button type="button" class="btn" data-nav="fwd" title="Forward (&rarr;)">&#x25B6;</button>
+                <button type="button" class="btn" data-nav="end" title="End (End)">&#x23ED;</button>
+                <button type="button" class="btn" id="flip" title="Flip board (F)">&#x21C5;</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- right side -->
+    <aside class="an-side">
+        {% if saved_game %}
+        <div class="an-title">
+            <p class="kicker">From your library</p>
+            <h1 style="font-size: 1.4rem;">{{ saved_game.white|default:"?" }} – {{ saved_game.black|default:"?" }} <span class="muted" style="font-weight: 400;">{{ saved_game.result }}</span></h1>
+            <p class="small muted">{{ saved_game.event }}{% if saved_game.date %} &middot; {{ saved_game.date }}{% endif %}{% if saved_game.opening %} &middot; {{ saved_game.opening }}{% endif %}</p>
+        </div>
+        {% else %}
+        <div class="an-title">
+            <input class="input title" id="prep-title" maxlength="120" placeholder="Name this prep, e.g. Caro-Kann as Black"
+                   value="{{ prep.title|default:'' }}" aria-label="Preparation title">
+            <div class="an-meta">
+                <select class="input" id="prep-side" aria-label="Your side">
+                    <option value="w" {% if prep.side != 'b' %}selected{% endif %}>I play White</option>
+                    <option value="b" {% if prep.side == 'b' %}selected{% endif %}>I play Black</option>
+                </select>
+                <input class="input" id="prep-opponent" maxlength="100" placeholder="Opponent (optional)" value="{{ prep.opponent|default:'' }}" aria-label="Opponent">
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="btn-row" style="align-items: center;">
+            {% if user.is_authenticated %}
+                <button type="button" class="btn btn-primary" id="save-btn">{% if saved_game %}Save notes{% else %}Save{% endif %}</button>
+                {% if saved_game %}<button type="button" class="btn" id="to-prep-btn">Copy to new prep</button>{% endif %}
+            {% endif %}
+            <span class="save-state" id="save-state">{% if prep %}Saved {{ prep.updated|date:"j M, H:i" }}{% endif %}</span>
+        </div>
+
+        <div class="panel engine">
+            <div class="panel-head">
+                <label><input type="checkbox" id="engine-on"> Stockfish</label>
+                <span class="depth" id="engine-depth"></span>
+            </div>
+            <div class="lines" id="engine-lines"><div class="line muted">Turn the engine on to see the top 3 moves.</div></div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <h3>Moves</h3>
+                <span class="btn-row">
+                    <button type="button" class="btn btn-sm btn-quiet" id="promote-btn" title="Make the current side line the main line">Promote</button>
+                    <button type="button" class="btn btn-sm btn-quiet" id="delete-btn" title="Delete from this move on">Delete</button>
+                </span>
+            </div>
+            <div class="tree" id="tree"></div>
+        </div>
+
+        <div class="field" style="margin: 0;">
+            <label for="move-comment" class="label">Comment on <span id="comment-target">the starting position</span></label>
+            <textarea class="input" id="move-comment" rows="2" placeholder="Why this move? What's the plan?"></textarea>
+        </div>
+
+        {% if saved_game %}
+        <div class="field" style="margin: 0;">
+            <label for="game-notes" class="label">Game notes</label>
+            <textarea class="input" id="game-notes" rows="4">{{ saved_game.notes }}</textarea>
+        </div>
+        <div class="field" style="margin: 0;">
+            <label for="game-collection" class="label">Collection</label>
+            <select class="input" id="game-collection">
+                <option value="">None</option>
+                {% for c in collections %}<option value="{{ c.id }}" {% if saved_game.collection_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        {% else %}
+        <div class="field" style="margin: 0;">
+            <label for="prep-notes" class="label">Notes for this prep</label>
+            <textarea class="input" id="prep-notes" rows="4" placeholder="Their tendencies, the lines to avoid, what to aim for in the middlegame…">{{ prep.notes|default:'' }}</textarea>
+        </div>
+        {% endif %}
+
+        <div class="an-tools">
+            <button type="button" class="btn btn-sm" id="open-import">Upload / paste PGN</button>
+            <button type="button" class="btn btn-sm" id="copy-pgn">Copy PGN</button>
+            <button type="button" class="btn btn-sm" id="download-pgn">Download .pgn</button>
+            <button type="button" class="btn btn-sm btn-quiet" id="clear-board">Clear</button>
+            {% if prep %}
+            <form method="post" action="{% url 'prep_delete' prep.pk %}" id="delete-prep-form" style="margin-left: auto;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Delete prep</button>
+            </form>
+            {% endif %}
+        </div>
+        <p class="small muted">Drag pieces to add moves. Playing a different move from the same position creates a side line. Arrow keys step through the moves.</p>
+    </aside>
+</div>
+
+<!-- pgn upload popup -->
+<div class="modal" id="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <div class="modal-box wide">
+        <h2 id="import-title">Load a PGN or FEN</h2>
+        <p class="small">Upload a .pgn file, drop one here, or paste text. Side lines and comments are kept.</p>
+        <div class="dropzone" id="dropzone" style="margin-top: 14px;">
+            <p>Drop a .pgn file here, or <label for="pgn-file" style="color: var(--accent); cursor: pointer; text-decoration: underline;">choose a file</label></p>
+            <input type="file" id="pgn-file" accept=".pgn,.txt,application/x-chess-pgn,text/plain" class="visually-hidden">
+        </div>
+        <textarea class="input" id="pgn-text" rows="6" style="margin-top: 12px; font-family: var(--font-mono); font-size: .85rem;"
+                  placeholder="1. e4 c6 2. d4 d5 3. Nc3 (3. e5 Bf5) 3... dxe4 *&#10;&#10;or a FEN, e.g. rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq c6 0 2"></textarea>
+        <p class="alert" id="import-error" hidden></p>
+        <div id="game-pick-wrap" hidden>
+            <p class="small" style="margin-top: 12px;"><strong id="game-count"></strong> Pick one to open on the board{% if user.is_authenticated %}, or import them all into your library{% endif %}.</p>
+            <div class="game-pick" id="game-pick"></div>
+            {% if user.is_authenticated %}
+            <div class="btn-row" style="margin-top: 10px; align-items: center;">
+                <input class="input" id="import-collection" placeholder="Collection name (optional)" style="flex: 1; min-width: 180px;">
+                <button type="button" class="btn btn-dark" id="import-all">Import all to library</button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-quiet" data-close>Cancel</button>
+            <button type="button" class="btn btn-primary" id="load-text">Load</button>
+        </div>
+    </div>
+</div>
+
+<!-- promotion popup -->
+<div class="modal" id="promo-modal" role="dialog" aria-modal="true" aria-label="Choose a piece">
+    <div class="modal-box" style="max-width: 320px; text-align: center;">
+        <h2 style="font-size: 1.2rem;">Promote to</h2>
+        <div class="btn-row" id="promo-choices" style="justify-content: center; margin-top: 12px;"></div>
+    </div>
+</div>
+
+{{ page_data|json_script:"page-data" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="{% static 'js/chessboard-1.0.0.min.js' %}"></script>
+<script src="{% static 'js/board-fit.js' %}"></script>
+<script type="module">
+    import { Chess } from '{% static "vendor/chessjs/chess.js" %}';
+    import { initAnalysis } from '{% static "js/analysis.js" %}';
+    initAnalysis(Chess, JSON.parse(document.getElementById('page-data').textContent));
+</script>
+{% endblock %}

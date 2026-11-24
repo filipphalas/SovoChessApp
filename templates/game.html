@@ -1,155 +1,386 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Game - SovoChess{% endblock %}
+{% block title %}Game {{ game.id }} · {{ game.time_control_label }} · SovoChess{% endblock %}
 
 {% block content %}
-
-<link rel="stylesheet" href="{% static 'css/chessboard-1.0.0.min.css' %}">
-
-<div style="display: flex; justify-content: center; gap: 30px; align-items: flex-start; margin-top: 20px;">
+<div class="game-layout">
 
     <!--left side-->
-    <div style="flex-shrink: 0;">
-        <h2 style="color: #ffffff; margin-bottom: 15px; text-align: center; font-size: 22px; letter-spacing: 2px;">SovoChess — Game #{{ game.id }}</h2>
-        <div id="board" style="width: 620px;"></div>
-    </div>
+    <section class="board-col" id="board-col">
+        <div class="board-stack" id="board-stack">
+            <div class="player-strip">
+                <div class="who">
+                    <span class="piece-icon b" aria-hidden="true">♜</span>
+                    <div>
+                        <div class="name">SovoBot</div>
+                        <div class="captured" id="cap-black" aria-label="Pieces captured by Black"></div>
+                    </div>
+                </div>
+                <div class="clock" id="clock-b" {% if not game.is_timed %}hidden{% endif %} aria-label="Black's clock">–:––</div>
+            </div>
 
-    <!--right side-->
-    <div style="background-color: #3e3e62; border: 1px solid #333; padding: 30px 25px; border-radius: 10px; min-width: 220px; margin-top: 50px;">
+            <div id="board" class="board-shadow"></div>
 
-        <!-- turn indicator -->
-        <div style="margin-bottom: 25px;">
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Current Turn</p>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div id="turn-indicator" style="width: 18px; height: 18px; border-radius: 50%; background-color: white; border: 2px solid #555;"></div>
-                <strong id="turn" style="color: #ffffff; font-size: 18px;">White</strong>
+            <div class="player-strip">
+                <div class="who">
+                    <span class="piece-icon w" aria-hidden="true">♔</span>
+                    <div>
+                        <div class="name">{{ request.user.username }} <span class="rating small">{{ request.user.current_rating }}</span></div>
+                        <div class="captured" id="cap-white" aria-label="Pieces captured by White"></div>
+                    </div>
+                </div>
+                <div class="clock" id="clock-w" {% if not game.is_timed %}hidden{% endif %} aria-label="Your clock">–:––</div>
             </div>
         </div>
+    </section>
 
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 25px;">
-
-        <!-- move counter -->
-        <div style="margin-bottom: 25px;">
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">Moves Played</p>
-            <strong id="move-count" style="color: #ffffff; font-size: 32px;">0</strong>
+    <!--right side-->
+    <aside class="side">
+        <div class="game-title">
+            <h1>vs SovoBot</h1>
+            <span class="tag">{% if game.is_timed %}{{ game.time_control_label }}{% else %}Untimed{% endif %}</span>
         </div>
-
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 25px;">
-
-        <!--info for player  -->
-        <div style="margin-bottom: 25px;">
-            <p style="color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Playing as</p>
-            <strong style="color: #ffffff; font-size: 16px;">{{ request.user.username }}</strong>
-            <p style="color: #888; margin-top: 6px; font-size: 13px;">Rating: <span style="color: #f0c040; font-weight: bold;">{{ request.user.current_rating }}</span></p>
-        </div>
-
-        <hr style="border: none; border-top: 1px solid #333; margin-bottom: 25px;">
 
         <!-- status msg -->
-        <div id="status" style="color: #ff1700; font-weight: bold; min-height: 20px; font-size: 14px;"></div>
+        <div id="status" class="status-line turn" role="status" aria-live="polite">
+            <span id="status-text">You have White. Make your first move.</span>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <h3>Moves</h3>
+                <span class="small muted" id="opening-name"></span>
+            </div>
+            <div class="movesheet" id="move-list"></div>
+        </div>
 
         <!-- resign btn -->
-        <button onclick="resignGame()" style="margin-top: 20px; width: 100%; padding: 12px; background-color: #5b0000; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 14px; letter-spacing: 1px;">
-            Resign
-        </button>
-    </div>
+        <div class="game-actions" id="actions-live">
+            <button type="button" class="btn btn-danger" id="resign-btn">Resign</button>
+            <button type="button" class="btn" id="flip-btn" title="Flip board (F)">Flip board</button>
+        </div>
+        <div class="game-actions" id="actions-over" hidden>
+            <a href="{% url 'post_game' game.id %}" class="btn btn-primary">Game summary</a>
+            <a href="{% url 'start_game' %}?tc={{ game.time_control_label|default:'none'|urlencode }}" class="btn" id="rematch">Play again</a>
+        </div>
 
+        <p class="small muted">Pawns promote to a queen. Use ← and → to step through the game.</p>
+    </aside>
 </div>
 
 <!--checkmate and stalemate -->
-<div id="checkmate-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1000; justify-content:center; align-items:center;">
-    <div style="background-color: #1e1e2e; border: 1px solid #444; padding: 50px 40px; border-radius: 12px; text-align: center; min-width: 300px;">
-        <h2 id="checkmate-message" style="color: #f0c040; margin-bottom: 10px; font-size: 24px;"></h2>
-        <p id="opening-name" style="color: #aaaaaa; margin-bottom: 30px; font-size: 14px;"></p>
-        <a href="/">
-            <button style="padding: 12px 30px; background-color: #f0c040; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px; font-weight: bold;">Home</button>
-        </a>
-        <a href="/game/start/">
-            <button style="padding: 12px 30px; background-color: #1e1e2e; border: 1px solid #f0c040; color: white; border-radius: 6px; cursor: pointer;">Play Again</button>
-        </a>
+<div class="modal" id="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="modal-box">
+        <p class="kicker" id="result-kicker"></p>
+        <h2 id="result-title"></h2>
+        <p id="result-opening"></p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-quiet" data-close>View board</button>
+            <a href="{% url 'post_game' game.id %}" class="btn btn-primary">Game summary</a>
+        </div>
     </div>
 </div>
 
+<div class="modal" id="resign-modal" role="dialog" aria-modal="true" aria-labelledby="resign-title">
+    <div class="modal-box">
+        <h2 id="resign-title">Resign this game?</h2>
+        <p>It will be recorded as a loss.</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-quiet" data-close>Keep playing</button>
+            <button type="button" class="btn btn-primary" id="resign-confirm">Resign</button>
+        </div>
+    </div>
+</div>
+
+{{ game_state|json_script:"game-state" }}
+{% endblock %}
+
+{% block scripts %}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="{% static 'js/chessboard-1.0.0.min.js' %}"></script>
-<script>
-    var gameId = {{ game.id }};
-    var currentTurn = 'w';
-    var moveCount = 0;
-// the reload the pos
-    function reloadPosition() {
-        fetch('/game/' + gameId + '/position/')
-        .then(response => response.json())
-        .then(data => {
-            board.position(data.fen);
-        })
+<script src="{% static 'js/board-fit.js' %}"></script>
+<script type="module">
+import { Chess } from '{% static "vendor/chessjs/chess.js" %}';
+
+const state = JSON.parse(document.getElementById('game-state').textContent);
+const csrf = document.querySelector('meta[name=csrf-token]').content;
+const PIECES = '{% static "img/chesspieces/wikipedia/" %}';
+const GLYPH = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+
+let chess = new Chess();
+let moves = state.moves.slice();  // like "e2e4"
+let sans = [];
+let viewPly = null;  // null = current position, a number = looking back at an older move
+let waiting = false;
+let over = state.over;
+
+
+const $id = id => document.getElementById(id);
+
+function post(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: body ? JSON.stringify(body) : null,
+    }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+}
+
+function setStatus(kind, html) {
+    $id('status').className = 'status-line ' + kind;
+    $id('status-text').innerHTML = html;
+}
+
+function uciMove(c, uci) {
+    return c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || 'q' });
+}
+
+// rebuild from the move list, the server decides whats legal
+function rebuild() {
+    chess = new Chess();
+    sans = [];
+    for (const m of moves) {
+        try { sans.push(uciMove(chess, m).san); }
+        catch (e) { break; }  // shouldnt happen unless our engine and chess.js disagree
     }
-// to show the checkmate and who won by checkmate + opening + the modal
-    function showCheckmateModal(winner, opening) {
-        document.getElementById('checkmate-message').innerText = winner + ' wins by checkmate!';
-        document.getElementById('opening-name').innerText = 'Opening played: ' + opening;
-        document.getElementById('checkmate-modal').style.display = 'flex';
-        setTimeout(function() {
-            window.location.href = '/game/' + gameId + '/result/';
-        }, 3000);
+}
+
+
+function renderMoves() {
+    const list = $id('move-list');
+    if (!sans.length) {
+        list.innerHTML = '<p class="none">No moves yet.</p>';
+        return;
     }
-//show the stalemate + opening + window
-    function showStalemateModal(opening) {
-        document.getElementById('checkmate-message').innerText = 'Stalemate! It\'s a draw!';
-        document.getElementById('opening-name').innerText = 'Opening played: ' + opening;
-        document.getElementById('checkmate-modal').style.display = 'flex';
-        setTimeout(function() {
-            window.location.href = '/game/' + gameId + '/result/';
-        }, 3000);
+    const cur = viewPly === null ? sans.length - 1 : viewPly - 1;
+    let html = '';
+    for (let i = 0; i < sans.length; i += 2) {
+        html += '<div class="row"><span class="n">' + (i / 2 + 1) + '</span>' +
+            '<span class="' + (i === cur ? 'latest' : '') + '">' + sans[i] + '</span>' +
+            '<span class="' + (i + 1 === cur ? 'latest' : '') + '">' + (sans[i + 1] || '') + '</span></div>';
     }
-// resign the game
-    function resignGame() {
-        if (confirm('Are you sure you want to resign?')) {
-            window.location.href = '/';
+    list.innerHTML = html;
+    if (viewPly === null) list.scrollTop = list.scrollHeight;
+}
+
+function renderCaptured() {
+    // captured pieces = whats missing from the board
+    const start = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+    const left = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+    chess.board().flat().forEach(sq => { if (sq && sq.type !== 'k') left[sq.color][sq.type]++; });
+    let score = 0;
+    const takenBy = { w: '', b: '' };
+    for (const t of ['q', 'r', 'b', 'n', 'p']) {
+        const lostB = Math.max(0, start[t] - left.b[t]), lostW = Math.max(0, start[t] - left.w[t]);
+        takenBy.w += GLYPH[t].repeat(lostB);
+        takenBy.b += GLYPH[t].repeat(lostW);
+        score += (left.w[t] - left.b[t]) * VALUE[t];
+    }
+    $id('cap-white').innerHTML = takenBy.w + (score > 0 ? '<b>+' + score + '</b>' : '');
+    $id('cap-black').innerHTML = takenBy.b + (score < 0 ? '<b>+' + (-score) + '</b>' : '');
+}
+
+function highlight(fenGame) {
+    $('#board .last-move, #board .check').removeClass('last-move check');
+    const hist = fenGame.history({ verbose: true });
+    const last = hist[hist.length - 1];
+    if (last) {
+        $('#board [data-square="' + last.from + '"]').addClass('last-move');
+        $('#board [data-square="' + last.to + '"]').addClass('last-move');
+    }
+    if (fenGame.inCheck()) {
+        const kingSq = fenGame.board().flat().find(s => s && s.type === 'k' && s.color === fenGame.turn());
+        if (kingSq) $('#board [data-square="' + kingSq.square + '"]').addClass('check');
+    }
+}
+
+function showPly(ply, animate = true) {
+    viewPly = (ply === null || ply >= sans.length) ? null : Math.max(0, ply);
+    const g = new Chess();
+    const upto = viewPly === null ? sans.length : viewPly;
+    for (let i = 0; i < upto; i++) g.move(sans[i]);
+    board.position(g.fen(), animate);
+    highlight(g);
+    renderMoves();
+}
+
+function refresh(animate = true) {
+    board.position(chess.fen(), animate);
+    viewPly = null;
+    highlight(chess);
+    renderMoves();
+    renderCaptured();
+}
+
+// clock
+
+const clock = state.clock ? { w: state.clock.white_ms, b: state.clock.black_ms, running: state.clock.running } : null;
+let tickBase = performance.now();
+let flagSent = false;
+
+function fmtClock(ms) {
+    ms = Math.max(0, ms);
+    if (ms < 10000) return (ms / 1000).toFixed(1);  // show tenths under 10 sec
+    const s = Math.ceil(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+}
+
+function setClock(c) {
+    if (!clock || !c) return;
+    clock.w = c.white_ms; clock.b = c.black_ms; clock.running = c.running;
+    tickBase = performance.now();
+    drawClock();
+}
+
+function currentWhiteMs() {
+    return clock.running === 'w' && !waiting ? clock.w - (performance.now() - tickBase) : clock.w;
+}
+
+function drawClock() {
+    if (!clock) return;
+    const w = currentWhiteMs();
+    const elW = $id('clock-w'), elB = $id('clock-b');
+    elW.textContent = fmtClock(w);
+    elB.textContent = fmtClock(clock.b);
+    elW.classList.toggle('running', clock.running === 'w' && !waiting && !over);
+    elB.classList.toggle('running', waiting && !over);
+    elW.classList.toggle('low', w < 20000);
+    elB.classList.toggle('low', clock.b < 20000);
+    if (w <= 0 && clock.running === 'w' && !over && !flagSent) {
+        flagSent = true;
+        post(state.urls.flag).then(data => {
+            setClock(data.clock);
+            if (data.game_over) gameOver(data);
+            else flagSent = false;  // server still had some time left
+        }).catch(() => { flagSent = false; });
+    }
+}
+
+if (clock) {
+    drawClock();
+    (function loop() { if (!over) drawClock(); requestAnimationFrame(loop); })();
+}
+
+// to show the checkmate and who won + opening + the modal
+
+const TERMINATION = { checkmate: 'by checkmate', stalemate: 'by stalemate', timeout: 'on time', resign: 'by resignation' };
+
+function gameOver(data, quiet) {
+    over = data;
+    waiting = false;
+    if (clock) { clock.running = null; drawClock(); }
+    let title, kicker;
+    if (data.result === 'win') { kicker = '1 – 0'; title = 'You won ' + (TERMINATION[data.termination] || ''); }
+    else if (data.result === 'loss') { kicker = '0 – 1'; title = 'SovoBot won ' + (TERMINATION[data.termination] || ''); }
+    else { kicker = '½ – ½'; title = 'Draw ' + (TERMINATION[data.termination] || ''); }
+    setStatus('over', title + '.');
+    $id('result-kicker').textContent = kicker;
+    $id('result-title').textContent = title;
+    $id('result-opening').textContent = data.opening ? 'Opening: ' + data.opening : '';
+    $id('opening-name').textContent = data.opening || '';
+    $id('actions-live').hidden = true;
+    $id('actions-over').hidden = false;
+    if (!quiet) setTimeout(() => openModal('result-modal'), 450);
+}
+
+
+function clearHints() { $('#board .hint').removeClass('hint capture'); }
+
+function onDragStart(source, piece) {
+    if (waiting || over || viewPly !== null) return false;
+    if (piece.charAt(0) !== 'w' || chess.turn() !== 'w') return false;
+    chess.moves({ square: source, verbose: true }).forEach(m => {
+        $('#board [data-square="' + m.to + '"]').addClass('hint' + (m.captured ? ' capture' : ''));
+    });
+}
+
+function onDrop(source, target) {
+    clearHints();
+    if (target === 'offboard' || source === target) return 'snapback';
+
+    let move;
+    try { move = chess.move({ from: source, to: target, promotion: 'q' }); }
+    catch (e) { return 'snapback'; }
+
+    // show the move straight away, server checks it and sends back the bot move
+    const before = moves.slice();
+    moves.push(source + target);
+    sans.push(move.san);
+    renderMoves(); renderCaptured(); highlight(chess);
+
+    if (clock) { clock.w = currentWhiteMs(); tickBase = performance.now(); }  // has to be before waiting = true
+    waiting = true;
+    setStatus('', '<span class="thinking-dots"><span></span><span></span><span></span></span> SovoBot is thinking');
+
+    post(state.urls.move, { from: source, to: target }).then(data => {
+        waiting = false;
+        if (!data.valid) {
+            moves = before;
+            rebuild(); refresh(false);
+            setClock(data.clock);
+            if (data.game_over) return gameOver(data);
+            setStatus('error', 'That move wasn’t accepted. Try another one.');
+            return;
         }
-    }
-// fetch the and for turns status and move count of player
-    function onDrop(source, target) {
-        fetch('/game/' + gameId + '/move/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 'from': source, 'to': target })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.valid) {
-                currentTurn = currentTurn === 'w' ? 'b' : 'w';
-                document.getElementById('turn').innerText = currentTurn === 'w' ? 'White' : 'Black';
-                document.getElementById('turn-indicator').style.backgroundColor = currentTurn === 'w' ? 'white' : 'black';
-                document.getElementById('status').innerText = '';
-                moveCount++;
-                document.getElementById('move-count').innerText = moveCount;
+        if (data.bot_move) {
+            moves.push(data.bot_move);
+            try { sans.push(uciMove(chess, data.bot_move).san); } catch (e) { rebuild(); }
+        }
+        setTimeout(() => refresh(true), 120);  // wait a bit so my piece lands first
+        setClock(data.clock);
+        if (data.game_over) gameOver(data);
+        else setStatus('turn', chess.inCheck() ? 'Check! Your move.' : 'Your move.');
+    }).catch(() => {
+        waiting = false;
+        setStatus('error', 'Lost connection to the server. Reloading the position…');
+        // the reload the pos
+        fetch(state.urls.position).then(r => r.json()).then(d => { board.position(d.fen); setClock(d.clock); });
+        moves = before; rebuild();
+    });
+}
 
-                // reload position then check game state
-                fetch('/game/' + gameId + '/position/')
-                .then(response => response.json())
-                .then(posData => {
-                    board.position(posData.fen);
-                    if (data.checkmate) {
-                        showCheckmateModal(data.winner, data.opening);
-                    } else if (data.stalemate) {
-                        showStalemateModal(data.opening);
-                    }
-                })
-            } else {
-                document.getElementById('status').innerText = 'Invalid move!';
-                reloadPosition();
-            }
-        })
-    }
+function onSnapEnd() { board.position(chess.fen(), false); }
 
-    var board = Chessboard('board', {
-        position: 'start',
-        draggable: true,
-        pieceTheme: '/static/img/chesspieces/wikipedia/{piece}.png',
-        onDrop: onDrop
-    })
+
+const board = Chessboard('board', {
+    position: 'start',
+    draggable: true,
+    pieceTheme: PIECES + '{piece}.png',
+    moveSpeed: 160,
+    snapbackSpeed: 120,
+    onDragStart, onDrop, onSnapEnd,
+});
+
+// redraw without animation on resize, animating here made moves look like they happened twice
+SovoBoardFit($id('board-col'), $id('board-stack'), $id('board'), () => { board.resize(); showPly(viewPly, false); });
+
+rebuild();
+refresh(false);
+if (over) gameOver(over, true);
+else if (moves.length) setStatus('turn', 'Welcome back. Your move.');
+
+function openModal(id) { $id(id).classList.add('open'); }
+function closeModal(el) { el.closest('.modal').classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal(b)));
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+$id('resign-btn').addEventListener('click', () => openModal('resign-modal'));
+// resign the game
+$id('resign-confirm').addEventListener('click', () => {
+    $id('resign-modal').classList.remove('open');
+    post(state.urls.resign).then(gameOver).catch(() => setStatus('error', 'Couldn’t reach the server. Try again.'));
+});
+$id('flip-btn').addEventListener('click', () => { board.flip(); highlight(chess); });
+
+document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea')) return;
+    const cur = viewPly === null ? sans.length : viewPly;
+    if (e.key === 'ArrowLeft') { showPly(cur - 1); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { showPly(cur + 1); e.preventDefault(); }
+    else if (e.key === 'Escape') document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+    else if (e.key === 'f' || e.key === 'F') $id('flip-btn').click();
+});
 </script>
-
 {% endblock %}

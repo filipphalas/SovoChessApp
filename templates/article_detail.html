@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ article.title }} · SovoChess{% endblock %}
+
+{% block content %}
+<article class="article">
+    <header class="article-head">
+        <a class="kicker" href="{% url 'articles' %}?c={{ article.category }}">{{ article.get_category_display }}</a>
+        <h1>{{ article.title }}</h1>
+        {% if article.dek %}<p class="dek">{{ article.dek }}</p>{% endif %}
+        <p class="byline">By {{ article.author }} &middot; {{ article.published|date:"j F Y" }} &middot; {{ article.reading_minutes }} min read</p>
+    </header>
+
+    {% if article.image %}
+    <figure class="article-hero reveal">
+        <img src="{% static article.image %}" alt="">
+        {% if article.image_credit %}<figcaption>{{ article.image_credit }}</figcaption>{% endif %}
+    </figure>
+    {% endif %}
+
+    <div class="prose">
+        {% for b in blocks %}
+            {% if b.type == 'p' %}<p>{{ b.html }}</p>
+            {% elif b.type == 'h2' %}<h2>{{ b.html }}</h2>
+            {% elif b.type == 'quote' %}<blockquote class="reveal">{{ b.html }}</blockquote>
+            {% elif b.type == 'board' %}
+            <figure class="article-board reveal" data-fen="{{ b.fen }}" data-moves="{{ b.moves }}" data-orientation="{{ b.orientation }}">
+                <div class="ab-board"></div>
+                {% if b.moves %}
+                <div class="ab-progress"><i></i></div>
+                <div class="ab-controls">
+                    <button type="button" data-act="start" aria-label="Go to start">&#x23EE;</button>
+                    <button type="button" data-act="back" aria-label="Previous move">&#x25C0;</button>
+                    <button type="button" data-act="play" aria-label="Play">&#x25B6;</button>
+                    <button type="button" data-act="fwd" aria-label="Next move">&#x25B6;&#x258F;</button>
+                    <button type="button" data-act="end" aria-label="Go to end">&#x23ED;</button>
+                    <span class="ab-move"></span>
+                </div>
+                {% endif %}
+                {% if b.caption %}<figcaption>{{ b.caption }}</figcaption>{% endif %}
+            </figure>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <p class="small muted" style="margin-top: 30px;">
+        Want to look deeper? <a href="{% url 'analysis' %}">Open the analysis board</a> and paste any of these moves.
+    </p>
+</article>
+
+{% if more %}
+<section class="more-reading">
+    <div class="section-head"><h2>Keep reading</h2><a href="{% url 'articles' %}">All guides</a></div>
+    <div class="grid-3">
+        {% for a in more %}
+        <a class="story reveal {% cycle '' 'd1' 'd2' %}" href="{% url 'article' a.slug %}">
+            {% if a.image %}<div class="thumb"><img src="{% static a.image %}" alt="" loading="lazy"></div>
+            {% else %}<div class="thumb diagram"><div class="mini-board" data-fen="{{ a.cover_fen }}"></div></div>{% endif %}
+            <span class="kicker">{{ a.get_category_display }}</span>
+            <h3>{{ a.title }}</h3>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="{% static 'js/chessboard-1.0.0.min.js' %}"></script>
+<script src="{% static 'js/board-diagram.js' %}" data-pieces="{% static 'img/chesspieces/wikipedia/' %}"></script>
+<script type="module">
+    import { Chess } from '{% static "vendor/chessjs/chess.js" %}';
+    import { initArticleBoards } from '{% static "js/article-boards.js" %}';
+    initArticleBoards(Chess, '{% static "img/chesspieces/wikipedia/" %}');
+</script>
+{% endblock %}

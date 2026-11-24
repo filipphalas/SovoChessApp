@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Privacy Policy · SovoChess{% endblock %}
+
+{% block content %}
+<div class="doc">
+    <h1>Privacy Policy</h1>
+    <p class="muted">Last updated {{ site.last_updated }}</p>
+
+    <h2>Who runs this site</h2>
+    <p>{{ site.name }} is run by {{ site.operator }}{% if site.country %}, {{ site.country }}{% endif %}. You can contact me at {{ site.contact_email }}.</p>
+
+    <h2>What we store</h2>
+    <ul>
+        <li><strong>Your account:</strong> username, email address and a salted hash of your password (never the password itself).</li>
+        <li><strong>Your chess:</strong> games you play here, games you import into your library, your preparation files and notes, and your rating.</li>
+        <li><strong>A session cookie</strong> that keeps you logged in, and a CSRF cookie that protects forms. There are no advertising or tracking cookies.</li>
+    </ul>
+
+    <h2>What we don't do</h2>
+    <p>We don't sell or share your data, and we don't run analytics or ads. Stockfish runs inside your own browser, so the positions you analyse aren't sent to us unless you save them.</p>
+    <p>The news headlines on the home and Read pages are fetched by our server, so your browser does not contact those sites until you click a link.</p>
+
+    <h2>Your rights</h2>
+    <p>From the <a href="{% url 'account' %}">account page</a> you can download everything we hold about you, or delete your account and all of its data. For anything else, email {{ site.contact_email }}.</p>
+</div>
+{% endblock %}
